@@ -32,7 +32,7 @@ h1 b{color:var(--gold);font-weight:400}
 .dots{display:flex;gap:6px}
 .dots i{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.18);display:block}
 .dots i.done{background:var(--gold)}.dots i.now{background:var(--coral);box-shadow:0 0 0 3px rgba(255,107,107,.35)}
-.msg{background:rgba(255,255,255,.1);border-radius:16px;padding:10px 16px;font-size:clamp(17px,2.6vw,21px);min-height:52px;display:flex;align-items:center}
+.msg{background:rgba(255,255,255,.1);border-radius:16px;padding:12px 16px;font-size:clamp(17px,2.6vw,21px);min-height:52px;display:block;line-height:1.45;word-break:keep-all}
 .msg.bad{background:rgba(255,107,107,.25)}
 .paper{margin:14px auto 0;background:var(--paper);border-radius:18px;padding:clamp(8px,1.8vw,16px);box-shadow:0 10px 0 #d9ccb4,0 18px 30px rgba(0,0,0,.35);position:relative;
   background-image:repeating-linear-gradient(45deg,rgba(255,107,107,.06) 0 12px,transparent 12px 24px)}
@@ -42,8 +42,8 @@ h1 b{color:var(--gold);font-weight:400}
 .cell.f{border-style:solid;border-color:transparent}
 .cell.lock{position:relative}
 .cell.lock::after{content:"";position:absolute;right:4px;bottom:4px;width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 2px #fff}
-.cell.q{border:4px dashed var(--coral);color:var(--coral);font-size:calc(min(64px,(100vw - 90px)/var(--cols))*.55);background:#fff1ec;animation:qp 1.1s ease-in-out infinite}
-@keyframes qp{50%{transform:scale(1.07);box-shadow:0 0 0 6px rgba(255,107,107,.25)}}
+.cell.q{border:4px dashed var(--coral);color:var(--coral);font-size:calc(min(64px,(100vw - 90px)/var(--cols))*.55);background:#fff1ec;animation:qp 1s ease-in-out infinite}
+@keyframes qp{0%,100%{background:#fff1ec;border-color:var(--coral);color:var(--coral)}50%{background:#ffc9bd;border-color:#ffd166;color:#e04b4b}}
 .stk.wrong{animation:shake .45s 2}
 .cell.pop{animation:pop .25s}
 .cell.wrong{border:3px solid var(--coral2)!important;animation:shake .45s 2}
@@ -232,12 +232,37 @@ let per=2,tries=0,mode='find',stage=0,cleared=new Set(),answer=[],cells=[],locke
 function getAC(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state!=='running')ac.resume();}catch(e){}return ac;}
 // 터치할 때마다 소리 장치를 깨워 둠(iPad/iPhone은 잠시 조용하면 소리를 멈춤)
 let unlocked=false;
-['pointerdown','touchend','click'].forEach(ev=>document.addEventListener(ev,()=>{const a=getAC();if(!a)return;
+// 아이폰 무음 모드에서도 소리가 나도록: 소리 종류를 '재생(playback)'으로 바꿈
+try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch(e){}
+let silentEl=null;
+function iosUnlock(){if(silentEl)return;try{
+  const n=4410,b=new ArrayBuffer(44+n*2),v=new DataView(b),w=(o,t)=>[...t].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+  w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,44100,true);v.setUint32(28,88200,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
+  silentEl=new Audio(URL.createObjectURL(new Blob([b],{type:'audio/wav'})));silentEl.loop=true;silentEl.setAttribute('playsinline','');
+  const p=silentEl.play();if(p&&p.catch)p.catch(()=>{silentEl=null;});}catch(e){}}
+['pointerdown','touchend','click'].forEach(ev=>document.addEventListener(ev,()=>{iosUnlock();const a=getAC();if(!a)return;startBGM();
   if(!unlocked){try{const b=a.createBuffer(1,1,22050),src=a.createBufferSource();src.buffer=b;src.connect(a.destination);src.start(0);unlocked=true;}catch(e){}}},true));
 function tone(f,d,w=0,type='triangle',v=.18){
   if(!sound)return;const a=getAC();if(!a)return;try{
   const t=a.currentTime+w,o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.value=f;
   g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(a.destination);o.start(t);o.stop(t+d+.05)}catch(e){}}
+/* 문제 풀 때 흐르는 잔잔한 오르골 음악(직접 지은 곡) */
+const bgm={on:false,next:0,step:0,g:null,duck:false};
+const CH=[[60,64,67,72],[57,60,64,69],[53,57,60,65],[55,59,62,67],[60,64,67,72],[52,55,59,64],[53,57,60,65],[55,59,62,67]];
+const ARP=[0,1,2,3,2,1,2,1];
+const MEL=[[[0,76],[4,79]],[[0,76],[4,72]],[[0,77],[4,81]],[[0,79],[6,74]],[[0,76],[4,79]],[[0,83],[4,79]],[[0,81],[2,79],[4,77]],[[0,74],[4,71]]];
+const mf=m=>440*2**((m-69)/12);
+function bnote(m,t,d,v){try{const o=ac.createOscillator(),o2=ac.createOscillator(),g=ac.createGain();o.type='sine';o2.type='triangle';
+  o.frequency.value=mf(m);o2.frequency.value=mf(m)*2;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.01);g.gain.exponentialRampToValueAtTime(.0005,t+d);
+  const g2=ac.createGain();g2.gain.value=.25;o.connect(g);o2.connect(g2).connect(g);g.connect(bgm.g);o.start(t);o2.start(t);o.stop(t+d+.05);o2.stop(t+d+.05);}catch(e){}}
+function bgmApply(){if(!bgm.g)return;bgm.g.gain.setTargetAtTime(sound&&!bgm.duck?1:0,ac.currentTime,.4);}
+function startBGM(){if(bgm.on||!ac)return;bgm.on=true;bgm.g=ac.createGain();bgm.g.gain.value=0;bgm.g.connect(ac.destination);bgm.next=ac.currentTime+.2;bgmApply();
+  setInterval(()=>{if(!ac||document.hidden)return;if(bgm.next<ac.currentTime-1)bgm.next=ac.currentTime+.1;
+    while(bgm.next<ac.currentTime+.6){const t=bgm.next,bar=(bgm.step>>3)%8,i=bgm.step&7,c=CH[bar];
+      bnote(c[ARP[i]],t,1.1,.032);if(i===0)bnote(c[0]-12,t,2.2,.03);
+      MEL[bar].forEach(([k,m])=>{if(k===i)bnote(m,t,1.6,.045);});
+      bgm.next+=.32;bgm.step=(bgm.step+1)%64;}},150);}
 const sPlace=()=>{tone(988,.12);tone(1319,.15,.06)};
 const sBad=()=>{tone(220,.25,0,'square',.07);tone(185,.3,.15,'square',.07)};
 // 음이름 → 주파수
@@ -361,7 +386,7 @@ function nextGift(){if(!giftBag.length){giftBag=shuffle(WORDS);if(giftBag[0]===l
 const RB=a=>`<span class="rbox">${a.map(v=>`<span style="background:${STK[v][2]}">${STK[v][0]}</span>`).join('')}</span>`;
 const RULE1=a=>`<div class="rrow">${RB(a)}<span class="rarr">→</span>${RB(a)}<span class="rarr">→ …</span></div><div class="rtxt">이 묶음이 되풀이되는 규칙이었어요!</div>`;
 let justUnlocked=false,lastWin=null;
-function win(ruleHtml,gen,ul){
+function win(ruleHtml,gen,ul){bgm.duck=true;bgmApply();
   justUnlocked=false;
   if(mode==='find'){const was=isOpen();cleared.add(stage);saveProg();justUnlocked=!was&&isOpen();}
   const ov=$('ov'),sc=$('scene'),g=nextGift();
@@ -435,8 +460,8 @@ function confetti(){const ov=$('ov'),it=['snowflake','star','candy','bell','gift
   for(let i=0;i<50;i++){const c=document.createElement('div');c.className='conf';c.innerHTML=it[i%it.length];
     c.style.left=Math.random()*100+'%';c.style.width=(18+Math.random()*24)+'px';
     c.style.animationDuration=(2.5+Math.random()*2.5)+'s';c.style.animationDelay=(Math.random()*.8)+'s';ov.appendChild(c);setTimeout(()=>c.remove(),6000);}}
-$('again').onclick=()=>{$('ov').classList.remove('show');if(mode==='find'){load();return;}cells=cells.map((v,i)=>locked[i]?v:null);drawGrid();say('다시 한번 꾸며 봐요!');};
-$('next').onclick=()=>{$('ov').classList.remove('show');if(justUnlocked){justUnlocked=false;$('tFree').onclick();return;}if(mode==='find')stage=nextStage();load();};
+$('again').onclick=()=>{$('ov').classList.remove('show');bgm.duck=false;bgmApply();if(mode==='find'){load();return;}cells=cells.map((v,i)=>locked[i]?v:null);drawGrid();say('다시 한번 꾸며 봐요!');};
+$('next').onclick=()=>{$('ov').classList.remove('show');bgm.duck=false;bgmApply();if(justUnlocked){justUnlocked=false;$('tFree').onclick();return;}if(mode==='find')stage=nextStage();load();};
 
 /* 모드·소리 */
 $('tFind').onclick=()=>{mode='find';$('tFind').classList.add('on');$('tFree').classList.remove('on');load();};
@@ -445,7 +470,7 @@ $('tFree').onclick=()=>{if(!isOpen()){say(`🔒 1~8단계를 모두 통과하면
 // 선생님용: 제목을 5번 빠르게 누르면 잠금 풀기/다시 잠그기
 let tt=0,tc=0;document.querySelector('h1').addEventListener('click',()=>{const n=Date.now();tc=n-tt<600?tc+1:1;tt=n;
   if(tc>=5){tc=0;$('tp').classList.add('show');}});
-$('snd').onclick=()=>{sound=!sound;$('snd').innerHTML=`<img src="${sound?IMG.soundon:IMG.soundoff}" alt="">`;};
+$('snd').onclick=()=>{sound=!sound;bgmApply();$('snd').innerHTML=`<img src="${sound?IMG.soundon:IMG.soundoff}" alt="">`;};
 
 /* 눈 */
 const sf=$('snowfx');sf.innerHTML=Array.from({length:26},()=>`<i style="left:${Math.random()*100}%;font-size:${8+Math.random()*14}px;animation-duration:${8+Math.random()*10}s;animation-delay:-${Math.random()*15}s">❄</i>`).join('');
