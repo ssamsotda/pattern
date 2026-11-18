@@ -116,6 +116,21 @@ h1 b{color:var(--gold);font-weight:400}
 .rtxt{font-size:clamp(19px,3.4vw,24px);margin-top:6px}
 .conf{position:absolute;top:-30px;pointer-events:none;animation:conf linear forwards}
 @keyframes conf{to{transform:translateY(115vh) rotate(720deg)}}
+/* 태블릿 가로 화면: 한 화면에 쏙 들어오게 */
+@media (orientation:landscape) and (min-width:900px){
+ .wrap{max-width:1180px;padding-top:10px;padding-bottom:16px}
+ .bar{margin:8px 0 6px}
+ .grid{max-width:none!important;width:min(100%,calc(var(--cols)*min(92px,(100vh - 450px)/var(--rows,2))))}
+ .pal-t{margin:12px 0 6px}
+ .stk{width:clamp(48px,calc((100vw - 240px)/13),74px)}
+ .acts{margin-top:14px}
+ .ov.show{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:40px;align-content:center;align-items:center;padding:20px 40px}
+ .ov>.scene{grid-column:1;grid-row:1/span 6;margin:0!important;justify-self:end;align-self:center;width:min(420px,42vw);height:min(480px,82vh)}
+ .ov>.merry,.ov>.eng,.ov>.rule,.ov>#song,.ov>#ovActs{grid-column:2;justify-self:center}
+ .ov>.merry{margin-top:0;font-size:clamp(36px,5vw,64px)}
+ .ov>#ovActs{margin-bottom:0!important}
+ .sv img{max-height:70vh}
+}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition-duration:.01s!important}.snowfx{display:none}}
 @media (max-width:600px){header{justify-content:center;text-align:center}.cell{border-radius:10px;border-width:2px}}
 </style>
@@ -268,7 +283,7 @@ function load(){
     say('<b>?</b> 칸에는 무엇이 올까요? 규칙을 찾아 아래에서 골라요!');}
   $('done').style.display=mode==='free'?'':'none';
   $('palT').textContent=mode==='free'?'① 스티커를 고르고 ② 빈칸을 톡! 눌러요':'? 칸에 올 스티커를 톡! 눌러요';
-  $('grid').style.setProperty('--cols',cols);
+  $('grid').style.setProperty('--cols',cols);$('grid').style.setProperty('--rows',rows);
   $('grid').style.maxWidth=(cols*76)+'px';
   drawGrid();drawPal();}
 const qIdx=()=>mode==='find'?cells.findIndex(v=>v==null):-1;
